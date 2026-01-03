@@ -13,7 +13,7 @@ public class UserDAO {
     // AUTHENTICATE USER
     public User authenticate(String username, String password) {
         User user = null;
-        String sql = "SELECT * FROM users WHERE username = ? AND password = MD5(?) AND is_active = 1";
+        String sql = "SELECT * FROM users WHERE username = ? AND password = ? AND is_active = 1";
         
         System.out.println("AUTHENTICATE: " + username);
         
@@ -52,7 +52,7 @@ public class UserDAO {
     // CREATE
     public boolean addUser(User user) {
         String sql = "INSERT INTO users (username, password, nama_lengkap, email, role, is_active) " +
-                     "VALUES (?, MD5(?), ?, ?, ?, ?)";
+                     "VALUES (?, ?, ?, ?, ?, ?)";
         
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {

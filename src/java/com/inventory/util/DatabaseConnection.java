@@ -5,25 +5,37 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 
 public class DatabaseConnection {
-    // SESUAIKAN DENGAN SETUP DATABASE ANDA!
-    private static final String URL = "jdbc:mysql://localhost:3306/inventory_baju";
-    private static final String USER = "root";  // default XAMPP: "root"
-    private static final String PASSWORD = "";  // default XAMPP: kosong
-    
-    // Jika pakai MySQL standalone dengan password
-    // private static final String PASSWORD = "password123";
-    
+
     public static Connection getConnection() throws SQLException {
+        // Ambil konfigurasi dari Environment Variable (Docker)
+        // Jika tidak ada (null), pakai default (untuk test di laptop/XAMPP)
+        
+        String dbHost = System.getenv("DB_HOST");
+        if (dbHost == null) dbHost = "localhost"; // Fallback ke localhost
+
+        String dbPort = System.getenv("DB_PORT");
+        if (dbPort == null) dbPort = "3306";
+
+        String dbName = System.getenv("DB_NAME");
+        if (dbName == null) dbName = "inventory_baju";
+
+        String dbUser = System.getenv("DB_USER");
+        if (dbUser == null) dbUser = "root";
+
+        String dbPass = System.getenv("DB_PASSWORD");
+        if (dbPass == null) dbPass = ""; 
+
+        // Susun URL koneksi
+        String url = "jdbc:mysql://" + dbHost + ":" + dbPort + "/" + dbName + "?useSSL=false&allowPublicKeyRetrieval=true";
+
         try {
-            // Untuk MySQL 8.x
             Class.forName("com.mysql.cj.jdbc.Driver");
-            // Untuk MySQL 5.x
-            // Class.forName("com.mysql.jdbc.Driver");
             
-            System.out.println("Mencoba koneksi ke: " + URL);
-            Connection conn = DriverManager.getConnection(URL, USER, PASSWORD);
+            System.out.println("Mencoba koneksi ke: " + url);
+            Connection conn = DriverManager.getConnection(url, dbUser, dbPass);
             System.out.println("Koneksi berhasil!");
             return conn;
+            
         } catch (ClassNotFoundException e) {
             System.err.println("Driver MySQL tidak ditemukan!");
             throw new SQLException("Database driver not found", e);
