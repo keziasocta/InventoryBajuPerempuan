@@ -28,6 +28,14 @@
             color: #333;
             margin-bottom: 30px;
         }
+
+        
+        .logo {
+            display: block;
+            margin: 0 auto 0px auto;
+            width: 200px;
+            height: auto;
+        }
         
         .form-group {
             margin-bottom: 20px;
@@ -74,11 +82,28 @@
             text-align: center;
             margin-bottom: 15px;
         }
+        
+        .copyright {
+            text-align: center;
+            margin-top: 25px;
+            font-size: 12px;
+            color: #888;
+        }
+        
+        .copyright span {
+            display: block;
+        }
+
     </style>
 </head>
 <body>
     <div class="login-container">
-        <h2>Login Inventory Baju Perempuan</h2>
+        
+        <img src="${pageContext.request.contextPath}/assets/images/logo1.png"
+             alt="Logo Inventory"
+             class="logo">
+
+        <h2>Login</h2>
         
         <%-- Tampilkan pesan error --%>
         <% if (request.getParameter("error") != null) { %>
@@ -107,7 +132,11 @@
             
             <button type="submit">Login</button>
         </form>
-        
+            
+            <div class="copyright">
+                © 2026 Inventory Baju Perempuan. All Rights Reserved.<br>
+                Kezia, Ris Naia, Saldy
+            </div>
         
     </div>
 </body>

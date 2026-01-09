@@ -2,6 +2,7 @@ package com.inventory.controller;
 
 import com.inventory.model.Barang;
 import com.inventory.model.BarangDAO;
+import com.inventory.model.User;
 import java.io.IOException;
 import java.math.BigDecimal;
 import jakarta.servlet.ServletException;
@@ -15,24 +16,31 @@ import jakarta.servlet.http.HttpSession;
 public class BarangController extends HttpServlet {
 
     private final BarangDAO barangDAO = new BarangDAO();
-    
+
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
-        // Cek session
+
         HttpSession session = request.getSession(false);
         if (session == null || session.getAttribute("user") == null) {
             response.sendRedirect(request.getContextPath() + "/login");
             return;
         }
-        
+
+        User user = (User) session.getAttribute("user");
+        String role = user.getRole();
+
         String action = request.getParameter("action");
-        
-        if (action == null) {
-            action = "list";
+        if (action == null) action = "list";
+
+        // 🔐 BLOK VIEWER
+        if (role.equals("viewer") &&
+           (action.equals("new") || action.equals("edit") || action.equals("delete"))) {
+
+            response.sendRedirect(request.getContextPath() + "/barang?action=list&error=akses");
+            return;
         }
-        
+
         switch (action) {
             case "new":
                 showNewForm(request, response);
@@ -46,7 +54,7 @@ public class BarangController extends HttpServlet {
             case "search":
                 searchBarang(request, response);
                 break;
-            default: // "list"
+            default:
                 listBarang(request, response);
                 break;
         }
@@ -55,16 +63,26 @@ public class BarangController extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
-        // Cek session
+
         HttpSession session = request.getSession(false);
         if (session == null || session.getAttribute("user") == null) {
             response.sendRedirect(request.getContextPath() + "/login");
             return;
         }
-        
+
+        User user = (User) session.getAttribute("user");
+        String role = user.getRole();
+
         String action = request.getParameter("action");
-        
+
+        // 🔐 BLOK VIEWER
+        if (role.equals("viewer") &&
+           ("insert".equals(action) || "update".equals(action))) {
+
+            response.sendRedirect(request.getContextPath() + "/barang?action=list&error=akses");
+            return;
+        }
+
         if ("insert".equals(action)) {
             insertBarang(request, response);
         } else if ("update".equals(action)) {
@@ -73,200 +91,80 @@ public class BarangController extends HttpServlet {
             listBarang(request, response);
         }
     }
-    
-    // ========== METHOD HANDLERS ==========
-    
+
+    // ================= METHODS =================
+
     private void listBarang(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
         try {
             request.setAttribute("barangList", barangDAO.getAllBarang());
             request.getRequestDispatcher("/views/barang/list.jsp").forward(request, response);
         } catch (Exception e) {
-            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, 
-                "Error retrieving barang list: " + e.getMessage());
+            response.sendError(500, e.getMessage());
         }
     }
-    
+
     private void searchBarang(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
         String keyword = request.getParameter("keyword");
-        if (keyword == null || keyword.trim().isEmpty()) {
-            listBarang(request, response);
-            return;
-        }
-        
         try {
             request.setAttribute("barangList", barangDAO.searchBarang(keyword));
             request.setAttribute("keyword", keyword);
             request.getRequestDispatcher("/views/barang/list.jsp").forward(request, response);
         } catch (Exception e) {
-            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, 
-                "Error searching barang: " + e.getMessage());
+            response.sendError(500, e.getMessage());
         }
     }
-    
+
     private void showNewForm(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
         request.getRequestDispatcher("/views/barang/form.jsp").forward(request, response);
     }
-    
+
     private void showEditForm(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
-        try {
-            int id = Integer.parseInt(request.getParameter("id"));
-            Barang barang = barangDAO.getBarangById(id);
-            
-            if (barang == null) {
-                response.sendError(HttpServletResponse.SC_NOT_FOUND, "Barang tidak ditemukan");
-                return;
-            }
-            
-            request.setAttribute("barang", barang);
-            request.getRequestDispatcher("/views/barang/form.jsp").forward(request, response);
-            
-        } catch (NumberFormatException e) {
-            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "ID tidak valid");
-        }
+        int id = Integer.parseInt(request.getParameter("id"));
+        Barang barang = barangDAO.getBarangById(id);
+        request.setAttribute("barang", barang);
+        request.getRequestDispatcher("/views/barang/form.jsp").forward(request, response);
     }
-    
+
     private void insertBarang(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
-        // Validasi input
-        String nama = request.getParameter("nama");
-        String kategori = request.getParameter("kategori");
-        String ukuran = request.getParameter("ukuran");
-        String warna = request.getParameter("warna");
-        String stokStr = request.getParameter("stok");
-        String hargaStr = request.getParameter("harga");
-        
-        // Validasi required fields
-        if (nama == null || nama.trim().isEmpty() || 
-            hargaStr == null || hargaStr.trim().isEmpty()) {
-            
-            response.sendError(HttpServletResponse.SC_BAD_REQUEST, 
-                "Nama dan harga harus diisi");
-            return;
-        }
-        
-        try {
-            Barang barang = new Barang();
-            barang.setNama(nama.trim());
-            barang.setKategori(kategori != null ? kategori.trim() : "");
-            barang.setUkuran(ukuran != null ? ukuran.trim() : "");
-            barang.setWarna(warna != null ? warna.trim() : "");
-            
-            // Parse stok dengan default 0 jika kosong
-            if (stokStr != null && !stokStr.trim().isEmpty()) {
-                barang.setStok(Integer.parseInt(stokStr.trim()));
-            } else {
-                barang.setStok(0);
-            }
-            
-            // Parse harga
-            barang.setHarga(new BigDecimal(hargaStr.trim()));
-            
-            // Save to database
-            boolean success = barangDAO.addBarang(barang);
-            
-            if (success) {
-                response.sendRedirect(request.getContextPath() + "/barang?action=list&success=add");
-            } else {
-                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, 
-                    "Gagal menambahkan barang");
-            }
-            
-        } catch (NumberFormatException e) {
-            response.sendError(HttpServletResponse.SC_BAD_REQUEST, 
-                "Format angka tidak valid");
-        } catch (Exception e) {
-            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, 
-                "Error: " + e.getMessage());
-        }
+
+        Barang barang = new Barang();
+        barang.setNama(request.getParameter("nama"));
+        barang.setKategori(request.getParameter("kategori"));
+        barang.setUkuran(request.getParameter("ukuran"));
+        barang.setWarna(request.getParameter("warna"));
+        barang.setStok(Integer.parseInt(request.getParameter("stok")));
+        barang.setHarga(new BigDecimal(request.getParameter("harga")));
+
+        barangDAO.addBarang(barang);
+        response.sendRedirect(request.getContextPath() + "/barang?action=list&success=add");
     }
-    
+
     private void updateBarang(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
-        try {
-            int id = Integer.parseInt(request.getParameter("id"));
-            String nama = request.getParameter("nama");
-            String kategori = request.getParameter("kategori");
-            String ukuran = request.getParameter("ukuran");
-            String warna = request.getParameter("warna");
-            String stokStr = request.getParameter("stok");
-            String hargaStr = request.getParameter("harga");
-            
-            // Validasi
-            if (nama == null || nama.trim().isEmpty() || 
-                hargaStr == null || hargaStr.trim().isEmpty()) {
-                
-                response.sendError(HttpServletResponse.SC_BAD_REQUEST, 
-                    "Nama dan harga harus diisi");
-                return;
-            }
-            
-            Barang barang = new Barang();
-            barang.setId(id);
-            barang.setNama(nama.trim());
-            barang.setKategori(kategori != null ? kategori.trim() : "");
-            barang.setUkuran(ukuran != null ? ukuran.trim() : "");
-            barang.setWarna(warna != null ? warna.trim() : "");
-            
-            if (stokStr != null && !stokStr.trim().isEmpty()) {
-                barang.setStok(Integer.parseInt(stokStr.trim()));
-            } else {
-                barang.setStok(0);
-            }
-            
-            barang.setHarga(new BigDecimal(hargaStr.trim()));
-            
-            boolean success = barangDAO.updateBarang(barang);
-            
-            if (success) {
-                response.sendRedirect(request.getContextPath() + "/barang?action=list&success=update");
-            } else {
-                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, 
-                    "Gagal mengupdate barang");
-            }
-            
-        } catch (NumberFormatException e) {
-            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Format angka tidak valid");
-        } catch (Exception e) {
-            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, 
-                "Error: " + e.getMessage());
-        }
+
+        Barang barang = new Barang();
+        barang.setId(Integer.parseInt(request.getParameter("id")));
+        barang.setNama(request.getParameter("nama"));
+        barang.setKategori(request.getParameter("kategori"));
+        barang.setUkuran(request.getParameter("ukuran"));
+        barang.setWarna(request.getParameter("warna"));
+        barang.setStok(Integer.parseInt(request.getParameter("stok")));
+        barang.setHarga(new BigDecimal(request.getParameter("harga")));
+
+        barangDAO.updateBarang(barang);
+        response.sendRedirect(request.getContextPath() + "/barang?action=list&success=update");
     }
-    
+
     private void deleteBarang(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
-        try {
-            int id = Integer.parseInt(request.getParameter("id"));
-            
-            boolean success = barangDAO.deleteBarang(id);
-            
-            if (success) {
-                response.sendRedirect(request.getContextPath() + "/barang?action=list&success=delete");
-            } else {
-                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, 
-                    "Gagal menghapus barang");
-            }
-            
-        } catch (NumberFormatException e) {
-            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "ID tidak valid");
-        } catch (Exception e) {
-            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, 
-                "Error: " + e.getMessage());
-        }
-    }
-    
-    @Override
-    public String getServletInfo() {
-        return "Barang Controller for CRUD operations";
+
+        int id = Integer.parseInt(request.getParameter("id"));
+        barangDAO.deleteBarang(id);
+        response.sendRedirect(request.getContextPath() + "/barang?action=list&success=delete");
     }
 }
